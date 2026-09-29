@@ -1,0 +1,5 @@
+id,label,dice
+silent,Silent (Attenuated),-2
+whisp,Whispered (Attenuated),-1
+amp,Amplified,1
+amp_res,Amplified & resonant (max once/day),2

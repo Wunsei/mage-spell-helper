@@ -1,0 +1,10 @@
+id,label,dice
+sec,A few seconds,0
+min,~1 minute,-1
+hr,~1 hour,-2
+hrs,~8 hours,-3
+day,~1 day,-4
+wk,~1 week,-5
+month,~1 month,-6
+season,~1 season,-8
+yr,~1 year,-10

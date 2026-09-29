@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spellcasting helper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  /* ---------- Basics ---------- */
+  :root {
+    --bg: #211830;
+    --panel: #2c2140;
+    --line: #4a3a68;
+    --ink: #efe9f7;
+    --muted: #b3a6cc;
+    --die: #b6aecb;      /* plain base dice */
+    --die-ink: #1b1326;  /* text on light dice */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 2rem 1rem;
+    background: var(--bg); color: var(--ink);
+    font: 16px/1.5 system-ui, sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font: 600 2rem/1.15 ui-serif, Georgia, serif; margin: 0 0 .25rem; }
+  p.lede { color: var(--muted); margin: 0 0 1.5rem; }
+
+  /* Section headers get a fancier face; Georgia is the fallback if the font can't load */
+  .section-title {
+    font: 700 1.2rem/1.2 "Cinzel", "Trajan Pro", Georgia, serif;
+    letter-spacing: .08em;
+    margin: 2rem 0 .25rem; padding-bottom: .35rem;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 { font: 600 .95rem ui-serif, Georgia, serif; margin: .9rem 0 .4rem; }
+
+  /* ---------- Number fields and the top row ---------- */
+  .num {
+    width: 100%; padding: .2rem .3rem; text-align: center;
+    background: var(--bg); color: var(--ink); font: inherit;
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  .top-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1.75rem; }
+  .base-field { display: flex; align-items: center; gap: .6rem; font: 600 1rem ui-serif, Georgia, serif; }
+  .base-field .num { width: 5rem; }
+  .check { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+  .check input { width: 1.15rem; height: 1.15rem; accent-color: var(--c, var(--ink)); }
+  .check strong { color: var(--c); }
+  .check .hint { color: var(--muted); font-size: .85rem; }
+
+  /* ---------- Factor boxes: 5 per row, so 10 options fit in 2 rows ---------- */
+  .choices { display: grid; grid-template-columns: repeat(5, 1fr); gap: .5rem; }
+  .choice, .mana {
+    padding: .45rem .3rem; text-align: center;
+    background: var(--panel); color: var(--ink); font: inherit;
+    border: 2px solid var(--line); border-top: 4px solid var(--c);
+    border-radius: 8px;
+  }
+  .choice { cursor: pointer; }
+  .mana { display: flex; flex-direction: column; gap: .2rem; }
+  .choice strong, .mana strong { display: block; font: 600 .85rem/1.2 ui-serif, Georgia, serif; }
+  .choice span, .mana span { color: color-mix(in srgb, var(--c) 60%, white); font-size: .78rem; }
+
+  /* The Arcana boxes are slightly bigger than the rest */
+  .choices.big .choice { padding: .8rem .4rem; border-top-width: 6px; }
+  .choices.big .choice strong { font-size: 1.05rem; }
+  .choices.big .choice span { font-size: .88rem; }
+  .choice:hover:not(:disabled) { border-color: var(--c); }
+  .choice[aria-pressed="true"], .mana.active { border-color: var(--c); background: color-mix(in srgb, var(--c) 28%, var(--panel)); }
+  .choice:focus-visible, .mana .num:focus-visible { outline: 3px solid var(--c); outline-offset: 2px; }
+  .choice:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
+
+  .aa-counter { margin: .6rem 0 0; }
+  .aa-counter strong { font-size: 1.15rem; margin-left: .25rem; }
+  .aa-counter .hint { color: var(--muted); font-size: .9rem; margin-left: .6rem; }
+
+  /* ---------- The pool panel ---------- */
+  .pool { margin-top: 2rem; padding: 1.25rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .25rem 1.5rem; margin-bottom: 1rem; }
+  .notation { font: 700 2.5rem/1 ui-serif, Georgia, serif; }
+  .breakdown { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .1rem .6rem; font-size: .95rem; font-weight: 600; }
+
+  .roll-row { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1.25rem; }
+  .roll-btn {
+    padding: .55rem 1.6rem; border: 0; border-radius: 8px; cursor: pointer;
+    background: var(--ink); color: var(--die-ink); font: 700 1rem system-ui, sans-serif;
+  }
+  .roll-btn:hover:not(:disabled) { background: #fff; }
+  .roll-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .roll-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .hit-count { font: 700 1.6rem ui-serif, Georgia, serif; }
+  .status { margin: .5rem 0 0; color: var(--muted); font-size: .9rem; }
+  .status span + span { margin-left: .5rem; }
+  .status .warn { color: #ffcf70; }
+  .error { color: #ff9b9b; }
+
+  /* ---------- Dice ---------- */
+  .group { margin-top: 1.1rem; }
+  .group h4 { margin: 0 0 .45rem; font: 600 1rem ui-serif, Georgia, serif; }
+  .group h4 span { color: var(--muted); font-weight: 400; }
+  .group .row { display: flex; flex-wrap: wrap; gap: .6rem; }
+  .group .none { margin: 0; color: var(--muted); font-size: .9rem; }
+
+  .die {
+    display: grid; place-items: center; width: 52px; height: 52px;
+    background: var(--c, var(--die)); color: var(--on, var(--die-ink));
+    border: 2px solid transparent; border-radius: 10px;
+    font: 700 .85rem system-ui, sans-serif;
+  }
+  .die.rolled { font-size: 1.4rem; }
+  .die.new { animation: pop .25s ease-out; }
+  @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .die.new { animation: none; } }
+
+  /* After a roll: hits get a bright ring, misses are dimmed */
+  .hits .die { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .misses .die { opacity: .7; }
+
+  /* Removed dice sit in their own hatched, dashed zone as small hollow tokens */
+  .removed-zone {
+    padding: .6rem .75rem .8rem;
+    border: 2px dashed var(--line); border-radius: 10px;
+    background: repeating-linear-gradient(135deg, rgba(0, 0, 0, .28) 0 8px, rgba(0, 0, 0, .12) 8px 16px);
+  }
+  .removed-zone h4 { color: var(--muted); }
+  .die.gone {
+    width: 40px; height: 40px;
+    background: transparent; color: var(--c); border: 2px dashed var(--c);
+    font-size: .8rem; text-decoration: line-through; text-decoration-thickness: 2px;
+  }
+
+  /* ---------- Tooltip that follows the mouse over dice ---------- */
+  .tip {
+    position: fixed; z-index: 10; max-width: 260px; padding: .35rem .55rem;
+    background: var(--ink); color: var(--bg); border-radius: 6px;
+    font-size: .85rem; line-height: 1.3; pointer-events: none;
+  }
+
+  @media (max-width: 560px) {
+    .choices { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Spellcasting helper</h1>
+  <p class="lede">Set your base dice, choose the spell's factors, and the pool builds itself.</p>
+
+  <div class="top-row">
+    <label class="base-field">Base Dice:
+      <input class="num" id="base" type="number" min="0" inputmode="numeric">
+    </label>
+    <label class="check" id="desperateBox">
+      <input type="checkbox" id="desperate">
+      <span id="desperateLabel"></span>
+    </label>
+  </div>
+
+  <div id="factors"></div>
+
+  <section class="pool" aria-live="polite">
+    <div class="summary">
+      <div class="notation" id="notation"></div>
+      <div class="breakdown" id="breakdown"></div>
+    </div>
+
+    <div class="roll-row">
+      <button class="roll-btn" id="rollBtn" type="button">Roll</button>
+      <span class="hit-count" id="hitCount"></span>
+    </div>
+    <p class="status" id="status"></p>
+
+    <div id="groups"></div>
+    <p class="error" id="error" hidden></p>
+  </section>
+</main>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<script>
+// This script is organized in seven parts, top to bottom:
+//   1. Shared state        4. Spell factors (buttons and mana fields)
+//   2. Text helpers        5. The pool panel (totals, Roll, dice groups)
+//   3. Talking to Rust     6. Tooltip     7. Startup and rolling
+
+// =====================================================================
+// 1. Shared state
+// =====================================================================
+
+const state = {
+  rules: null,      // loaded once from /api/rules
+  baseDice: 5,      // the "Base Dice" field
+  desperate: false, // the "Desperate casting" checkbox
+  selections: {},   // button factors: factor id -> chosen option id
+  manaPaid: {},     // mana factors: factor id -> amount typed in
+  pool: null,       // the latest pool from the server
+  roll: null,       // the latest roll (see onRollClicked), or null if nothing is rolled
+  rolling: false,   // true while waiting for random numbers
+};
+
+const $ = id => document.getElementById(id);
+const factorById = id => state.rules.factors.find(factor => factor.id === id);
+
+/** Tiny helper for building elements. */
+function el(tag, className = '', text = '') {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+// =====================================================================
+// 2. Text helpers
+// =====================================================================
+
+const MINUS = '−';
+
+// In these sections a zero is written "−0", because their factors normally cost dice
+const MINUS_ZERO_SECTIONS = ['SCOPE'];
+
+function signOf(n, factor) {
+  const isNegative = n < 0;
+  const isSpecialZero = n === 0 && factor && MINUS_ZERO_SECTIONS.includes(factor.section);
+  return isNegative || isSpecialZero ? MINUS : '+';
+}
+
+const dieWord = n => (Math.abs(n) === 1 ? 'die' : 'dice');
+const diceText = (n, factor) => `${signOf(n, factor)}${Math.abs(n)} ${dieWord(n)}`;
+const withMinus = n => String(n).replace('-', MINUS);
+
+/** Reads a typed number: blank or negative becomes 0, and it never exceeds `max`. */
+function clampWholeNumber(text, max) {
+  const n = parseInt(text, 10);
+  return n >= 0 ? Math.min(n, max) : 0;
+}
+
+/** "Minor Arcana" becomes "Minor" because the factor name ("Arcana") is shown next to it. */
+function shortChoice(addition) {
+  const isArcana = addition.factor_id === state.rules.arcana_factor;
+  return isArcana ? addition.choice.replace(/\s*arcana$/i, '') : addition.choice;
+}
+
+/** "Range: Far", or just "Desperate casting" when there is no option name. */
+function sourceName(addition) {
+  return addition.choice ? `${addition.factor}: ${shortChoice(addition)}` : addition.factor;
+}
+
+/** "Range (Far)", or just "Desperate casting". */
+function breakdownLabel(addition) {
+  return addition.choice ? `${addition.factor} (${shortChoice(addition)})` : addition.factor;
+}
+
+/** Dark or white text, whichever is easier to read on this background color. */
+function contrastText(hex) {
+  const [r, g, b] = [1, 3, 5]
+    .map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.2 ? '#1b1326' : '#ffffff';
+}
+
+// =====================================================================
+// 3. Talking to the Rust server
+// =====================================================================
+
+const requestBody = () => JSON.stringify({
+  base_dice: state.baseDice,
+  desperate: state.desperate,
+  selections: state.selections,
+  mana_paid: state.manaPaid,
+});
+
+async function postToServer(url) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: requestBody(),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
+const fetchRules = async () => (await fetch('/api/rules')).json();
+const fetchPool = () => postToServer('/api/pool');
+const rollOnServer = () => postToServer('/api/roll');
+
+// =====================================================================
+// 4. Spell factors
+// =====================================================================
+
+// ---- The A&A limit: the chosen Arcana decides how many A&A factors can be used ----
+
+function chosenArcana() {
+  const arcana = factorById(state.rules.arcana_factor);
+  return arcana.choices.find(choice => choice.id === state.selections[arcana.id]) ?? null;
+}
+
+const aaSlotsAvailable = () => chosenArcana()?.aa_slots ?? 0;
+const aaFactors = () => state.rules.factors.filter(f => f.section === state.rules.aa_section);
+const aaSlotsUsed = () => aaFactors().filter(f => state.selections[f.id]).length;
+
+/** An A&A factor is grayed out once every slot is used and it isn't one of the used ones. */
+const isLocked = factor =>
+  factor.section === state.rules.aa_section &&
+  aaSlotsUsed() >= aaSlotsAvailable() &&
+  !state.selections[factor.id];
+
+/** If a smaller Arcana is picked, drop the A&A picks that no longer fit (last ones first). */
+function dropExtraAAs() {
+  let room = aaSlotsAvailable();
+  for (const factor of aaFactors()) {
+    if (!state.selections[factor.id]) continue;
+    if (room > 0) room -= 1;
+    else delete state.selections[factor.id];
+  }
+}
+
+// ---- Drawing the factors ----
+
+/** Draws every factor. `onChange` is called whenever the player changes one. */
+function renderFactors(onChange) {
+  const root = $('factors');
+  root.replaceChildren();
+  let previousSection = '';
+  let manaRow = null; // consecutive mana boxes share one row
+
+  for (const factor of state.rules.factors) {
+    if (factor.section && factor.section !== previousSection) {
+      root.append(el('h2', 'section-title', factor.section));
+      if (factor.section === state.rules.aa_section) root.append(aaCounter());
+      manaRow = null;
+    }
+    previousSection = factor.section;
+
+    if (factor.kind === 'count') {
+      if (!manaRow) manaRow = addRow(root);
+      manaRow.append(manaBox(factor, onChange));
+    } else {
+      manaRow = null;
+      root.append(...choiceFactor(factor, onChange));
+    }
+  }
+}
+
+function addRow(root) {
+  const row = el('div', 'choices');
+  root.append(row);
+  return row;
+}
+
+/** "A&As available: 2 (Moderate Arcana)" */
+function aaCounter() {
+  const arcana = chosenArcana();
+  const line = el('p', 'aa-counter');
+  line.append(
+    el('span', '', `${state.rules.aa_section} available:`),
+    el('strong', '', String(aaSlotsAvailable())),
+    el('span', 'hint', arcana ? `(${arcana.label})` : 'Choose an Arcana to unlock'),
+  );
+  return line;
+}
+
+// ---- Factors you pick from buttons ----
+
+/** A heading (unless the section header already names it) plus a row of buttons. */
+function choiceFactor(factor, onChange) {
+  const grid = el('div', 'choices');
+  grid.style.setProperty('--c', factor.color);
+  if (factor.id === state.rules.arcana_factor) grid.classList.add('big');
+  grid.setAttribute('role', 'group');
+  grid.setAttribute('aria-label', factor.label);
+
+  const locked = isLocked(factor);
+  for (const choice of factor.choices) {
+    grid.append(choiceButton(factor, choice, locked, onChange));
+  }
+
+  const aloneInSection = factor.section &&
+    state.rules.factors.filter(f => f.section === factor.section).length === 1;
+  return aloneInSection ? [grid] : [el('h3', '', factor.label), grid];
+}
+
+function choiceButton(factor, choice, locked, onChange) {
+  const button = el('button', 'choice');
+  button.type = 'button';
+  button.disabled = locked;
+  button.setAttribute('aria-pressed', String(state.selections[factor.id] === choice.id));
+  button.append(el('strong', '', choice.label), el('span', '', diceText(choice.dice, factor)));
+
+  button.addEventListener('click', () => {
+    toggleSelection(factor, choice);
+    dropExtraAAs();
+    renderFactors(onChange); // redraw so grayed-out boxes update
+    onChange();
+  });
+  return button;
+}
+
+/** Clicking the chosen option again un-chooses it. */
+function toggleSelection(factor, choice) {
+  if (state.selections[factor.id] === choice.id) delete state.selections[factor.id];
+  else state.selections[factor.id] = choice.id;
+}
+
+// ---- Factors you type a number for (mana) ----
+
+function manaBox(factor, onChange) {
+  const dicePerMana = factor.choices[0].dice;
+  const paid = state.manaPaid[factor.id] || 0;
+
+  const box = el('label', 'mana');
+  box.style.setProperty('--c', factor.color);
+  box.classList.toggle('active', paid > 0);
+
+  const input = el('input', 'num');
+  Object.assign(input, { type: 'number', min: 0, max: state.rules.max_mana, inputMode: 'numeric', value: paid });
+  input.addEventListener('input', () => {
+    const amount = clampWholeNumber(input.value, state.rules.max_mana);
+    if (Number(input.value) > state.rules.max_mana) input.value = amount;
+    state.manaPaid[factor.id] = amount;
+    box.classList.toggle('active', amount > 0);
+    onChange();
+  });
+
+  box.append(el('strong', '', factor.label), el('span', '', `${diceText(dicePerMana)} each`), input);
+  return box;
+}
+
+// =====================================================================
+// 5. The pool panel: totals, the Roll button, and the groups of dice
+// =====================================================================
+
+let previousDiceCount = 0; // so only newly added dice pop in
+
+const isHit = die => die.value >= state.rules.hit_min;
+
+/**
+ * Redraws the panel. While a roll is showing, the panel shows the pool that
+ * was rolled (not the live one), so the results stay on screen until the
+ * player changes something.
+ */
+function renderResults({ justRolled = false } = {}) {
+  const pool = state.roll ? state.roll.pool : state.pool;
+  if (!pool) return;
+
+  const { active, removed } = splitDice(pool);
+  const rolled = attachRolls(active);
+
+  renderSummary(pool);
+  renderRollControls(active, rolled);
+  renderGroups(active, removed, rolled, justRolled);
+  previousDiceCount = active.length;
+}
+
+// ---- Working out which dice exist ----
+
+/**
+ * `active` dice really exist: base dice first, then each factor's added dice,
+ * every one in its factor's color. `removed` dice are the ones negative
+ * factors take away, shown separately in the color of the factor that removed
+ * them. Removal cancels base dice first, so the factor-colored dice stay on
+ * screen; only if there are more removals than base dice do added dice go
+ * (from the end). The pool can still go below zero.
+ */
+function splitDice(pool) {
+  const baseDice = Array.from({ length: pool.base_dice }, () => ({ source: null }));
+
+  const addedDice = [];
+  for (const addition of pool.additions) {
+    for (let i = 0; i < addition.dice; i++) addedDice.push({ source: addition });
+  }
+
+  const removed = [];
+  for (const addition of pool.additions) {
+    for (let i = 0; i < -addition.dice; i++) removed.push({ removedBy: addition });
+  }
+
+  const fromBase = Math.min(removed.length, baseDice.length);
+  const fromAdded = removed.length - fromBase;
+  const active = [
+    ...baseDice.slice(0, baseDice.length - fromBase),
+    ...addedDice.slice(0, Math.max(0, addedDice.length - fromAdded)),
+  ];
+  active.forEach((die, i) => { die.position = i; });
+  return { active, removed };
+}
+
+/** Copies the rolled numbers onto the dice. Returns false if nothing is rolled. */
+function attachRolls(active) {
+  const values = state.roll?.rolls;
+  if (!values || values.length !== active.length) return false;
+  active.forEach((die, i) => { die.value = values[i]; });
+  return true;
+}
+
+// ---- Top of the panel ----
+
+/** "8d6" and the colored breakdown line. */
+function renderSummary(pool) {
+  $('notation').textContent = withMinus(pool.notation);
+
+  const coloredText = (text, color) => {
+    const span = el('span', '', text);
+    span.style.color = color;
+    return span;
+  };
+  $('breakdown').replaceChildren(
+    coloredText(`${pool.base_dice} base`, 'var(--die)'),
+    ...pool.additions.map(addition => {
+      const sign = signOf(addition.dice, factorById(addition.factor_id));
+      return coloredText(`${sign} ${Math.abs(addition.dice)} ${breakdownLabel(addition)}`, addition.color);
+    }),
+  );
+}
+
+function renderRollControls(active, rolled) {
+  const livePool = state.pool;
+
+  const button = $('rollBtn');
+  button.disabled = state.rolling || !livePool || livePool.total_dice <= 0;
+  button.textContent = state.rolling ? 'Rolling…' : 'Roll';
+
+  const hits = rolled ? active.filter(isHit).length : 0;
+  $('hitCount').textContent = rolled ? `${hits} ${hits === 1 ? 'hit' : 'hits'}` : '';
+
+  $('status').replaceChildren(
+    ...statusMessages(livePool).map(({ text, warn }) => el('span', warn ? 'warn' : '', text)),
+  );
+}
+
+function statusMessages(livePool) {
+  const messages = [];
+  const roll = state.roll;
+
+  if (roll) {
+    messages.push(roll.source === 'random.org'
+      ? { text: 'Rolled with random.org (true random).' }
+      : { text: "random.org couldn't be reached, so this roll used this computer's random number generator instead of true randomness.", warn: true });
+    if (roll.base_dice_after !== roll.base_dice_before) {
+      messages.push({ text: `Desperate casting: Base Dice went from ${roll.base_dice_before} to ${roll.base_dice_after}.` });
+    }
+  }
+
+  if (livePool && livePool.total_dice < 0) {
+    messages.push({ text: `Below zero (${withMinus(livePool.total_dice)}): nothing to roll.` });
+  } else if (livePool && livePool.total_dice === 0) {
+    messages.push({ text: 'No dice in the pool: nothing to roll.' });
+  }
+  return messages;
+}
+
+// ---- The groups of dice ----
+
+function renderGroups(active, removed, rolled, justRolled) {
+  const root = $('groups');
+  root.replaceChildren();
+
+  if (rolled) {
+    root.append(diceGroup('Hits', active.filter(isHit), 'hits', { animate: justRolled, emptyText: 'No hits.' }));
+    const misses = active.filter(die => !isHit(die));
+    if (misses.length) root.append(diceGroup('Misses', misses, 'misses', { animate: justRolled }));
+  } else if (active.length) {
+    root.append(diceGroup('Dice', active, 'dice-group'));
+  }
+
+  if (removed.length) root.append(diceGroup('Removed', removed, 'removed-zone', { isRemoved: true }));
+}
+
+function diceGroup(title, dice, className, { isRemoved = false, animate = false, emptyText = '' } = {}) {
+  const group = el('div', `group ${className}`);
+  const heading = el('h4', '', `${title} `);
+  heading.append(el('span', '', `(${dice.length})`));
+  group.append(heading);
+
+  if (dice.length) {
+    const row = el('div', 'row');
+    row.append(...dice.map(die => makeDie(die, isRemoved, animate)));
+    group.append(row);
+  } else if (emptyText) {
+    group.append(el('p', 'none', emptyText));
+  }
+  return group;
+}
+
+function makeDie(die, isRemoved, animate) {
+  const source = isRemoved ? die.removedBy : die.source; // null for plain base dice
+  const isRolled = die.value !== undefined;
+
+  const element = el('div', 'die');
+  if (source) {
+    element.style.setProperty('--c', source.color);
+    element.style.setProperty('--on', contrastText(source.color));
+  }
+  if (isRemoved) element.classList.add('gone');
+  if (isRolled) element.classList.add('rolled');
+  if (!isRemoved && (animate || die.position >= previousDiceCount)) element.classList.add('new');
+
+  const tip = tooltipText(die, isRemoved);
+  element.dataset.tip = tip;
+  element.setAttribute('aria-label', tip);
+  element.textContent = isRolled ? String(die.value) : `d${state.rules.sides}`;
+  return element;
+}
+
+/** What is responsible for this die being here (or being removed). */
+function tooltipText(die, isRemoved) {
+  if (isRemoved) {
+    const a = die.removedBy;
+    return `Removed by ${sourceName(a)} (removes ${Math.abs(a.dice)} ${dieWord(a.dice)})`;
+  }
+
+  const a = die.source;
+  let text = a ? `${sourceName(a)} (adds ${a.dice} ${dieWord(a.dice)})` : 'Base dice';
+  if (die.value !== undefined) text += `. Rolled ${die.value}${isHit(die) ? ' (a hit)' : ''}.`;
+  return text;
+}
+
+// =====================================================================
+// 6. Tooltip: a small label that follows the mouse while it is over a die
+// =====================================================================
+
+function setupTooltip() {
+  const zone = $('groups');
+  const tip = $('tip');
+  zone.addEventListener('mousemove', event => {
+    const die = event.target.closest('.die');
+    if (!die) {
+      tip.hidden = true;
+      return;
+    }
+    tip.textContent = die.dataset.tip;
+    tip.hidden = false;
+    const left = Math.min(event.clientX + 14, window.innerWidth - tip.offsetWidth - 8);
+    tip.style.left = `${Math.max(8, left)}px`;
+    tip.style.top = `${event.clientY + 16}px`;
+  });
+  zone.addEventListener('mouseleave', () => { tip.hidden = true; });
+}
+
+// =====================================================================
+// 7. Startup and rolling
+// =====================================================================
+
+function showError(message) {
+  const box = $('error');
+  box.textContent = message;
+  box.hidden = !message;
+}
+
+async function start() {
+  state.rules = await fetchRules();
+  state.baseDice = state.rules.default_base_dice;
+
+  setupBaseDiceField();
+  setupDesperateCheckbox();
+  $('rollBtn').addEventListener('click', onRollClicked);
+  setupTooltip();
+
+  renderFactors(onSelectionChanged);
+  await refreshPool();
+}
+
+function setupBaseDiceField() {
+  const field = $('base');
+  field.max = state.rules.max_base_dice;
+  field.value = state.baseDice;
+  field.addEventListener('input', () => {
+    state.baseDice = clampWholeNumber(field.value, state.rules.max_base_dice);
+    onSelectionChanged();
+  });
+}
+
+/** "Desperate casting +3 dice (Base Dice −1 after each roll)" */
+function setupDesperateCheckbox() {
+  const { label, dice, base_cost, color } = state.rules.desperate;
+  $('desperateBox').style.setProperty('--c', color);
+  $('desperateLabel').replaceChildren(
+    el('strong', '', label),
+    ` ${diceText(dice)} `,
+    el('span', 'hint', `(Base Dice ${MINUS}${base_cost} after each roll)`),
+  );
+  $('desperate').addEventListener('change', event => {
+    state.desperate = event.target.checked;
+    onSelectionChanged();
+  });
+}
+
+/** The player changed something, so any old roll no longer matches the pool. */
+function onSelectionChanged() {
+  state.roll = null;
+  refreshPool();
+}
+
+/** Asks the server for the current pool and redraws the panel. */
+async function refreshPool(options = {}) {
+  try {
+    state.pool = await fetchPool();
+    showError('');
+  } catch (error) {
+    showError(error.message);
+  }
+  renderResults(options);
+}
+
+async function onRollClicked() {
+  if (state.rolling || !state.pool || state.pool.total_dice <= 0) return;
+
+  const rolledPool = state.pool;
+  const baseDiceBefore = state.baseDice;
+  let rollError = null;
+  let justRolled = false;
+
+  state.rolling = true;
+  renderResults();
+
+  try {
+    const result = await rollOnServer();
+    // Keep the pool we rolled with, so the results stay on screen even though
+    // Desperate casting is about to lower Base Dice.
+    state.roll = { ...result, pool: rolledPool, base_dice_before: baseDiceBefore };
+    state.baseDice = result.base_dice_after;
+    $('base').value = state.baseDice;
+    justRolled = true;
+  } catch (error) {
+    rollError = `Roll failed: ${error.message}`;
+  }
+
+  state.rolling = false;
+  await refreshPool({ justRolled });
+  if (rollError) showError(rollError);
+}
+
+start();
+</script>
+</body>
+</html>

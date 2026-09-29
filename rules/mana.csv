@@ -1,0 +1,4 @@
+id,label,dice
+mana_matching,Matching mana,2
+mana_base,Base mana,1
+mana_nonmatching,Non-matching mana,1

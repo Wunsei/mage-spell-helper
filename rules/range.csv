@@ -1,0 +1,10 @@
+id,label,dice
+touch,Touch (0m),0
+reach,Reach (1~3m),-1
+conv,Conversational (3~10m),-2
+throw,Throwing (10~30m),-3
+shout,Shouting (30~100m),-4
+visual,Visual (100~1000m),-5
+city,City (1~20km),-6
+prov,Province (20~200km),-8
+country,Country (200~2000km),-10

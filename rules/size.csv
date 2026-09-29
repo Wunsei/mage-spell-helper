@@ -1,0 +1,10 @@
+id,label,dice
+fing,Fingernail,0
+hand,Hand,-1
+head,Head,-2
+human,Human,-3
+Sm-room,Small room,-4
+Lg-room,Large room,-5
+house,House,-6
+sf,Sports field,-8
+zity,City,-10

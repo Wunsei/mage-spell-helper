@@ -1,0 +1,10 @@
+id,label,dice
+0i,Subtly whispered. Calming touch. Beneath notice.,0
+1i,Softly spoken. Gentle tap. Barely there.,-1
+2i,Firmly spoken. Hard slap. Noticeable to observers.,-2
+3i,Shouted. Thrown rock. Obvious to observers.,-3
+4i,Megaphone-loud. Rifle shot. Draws outside attention.,-4
+5i,Thunderous. Dynamite explosion. Lasting impression.,-5
+6i,Deafening. Mortar round. Unforgettable event.,-6
+8i,Monumental. Carpet bomb. Life-defining experience.,-8
+10i,Demigodlike. Volcanic eruption. Shake the world.,-10

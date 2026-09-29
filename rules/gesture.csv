@@ -1,0 +1,5 @@
+id,label,dice
+still,Stillness (Attenuated),-2
+twitch,Twitch (Attenuated),-1
+amp,Amplified,1
+Amp-res,Amplified & resonant (max once/day),2

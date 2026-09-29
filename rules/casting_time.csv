@@ -1,0 +1,10 @@
+id,label,dice
+Ct-inst,Instant (Attenuated),-2
+Ct-min,~1 minute (Amplified),1
+Ct-hr,~1 hour (Amplified),2
+Ct-hrs,~8 hrs (Amplified),3
+Ct-day,~1 day (Amplified),4
+Ct-wk,~1 week (Amplified),5
+Ct-month,~1 month (Amplified),6
+Ct-szn,~1 season (Amplified),8
+Ct-yr,~1 year (Amplified),10
